@@ -1,4 +1,4 @@
-name: Build Android Release
+name: Build Signed Android Release
 
 on:
   workflow_dispatch:
@@ -11,22 +11,29 @@ jobs:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
       - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform (if needed)
         run: |
-          npm install
-          npm install -g @capacitor/android
+          npx cap add android || echo "Android already added"
 
       - name: Build web assets
         run: npm run build
@@ -34,23 +41,20 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
-      # 👉 Keystore ko decode karke android/app folder me save karo
       - name: Decode keystore
+        working-directory: android/app
         run: |
-          mkdir -p android/app
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-key.keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > release-key.keystore
 
-      # 👉 Signed release APK build
       - name: Build signed Android APK
+        working-directory: android
         run: |
-          cd android
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=app/release-key.keystore \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+            -Pandroid.injected.signing.key.password=$KEY_ALIAS_PASSWORD
 
-      # 👉 Signed APK ko artifact ke रूप me upload karo
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
