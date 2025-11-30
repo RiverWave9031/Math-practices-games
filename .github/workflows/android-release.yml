@@ -7,12 +7,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -28,13 +34,25 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
-      - name: Build Android APK
+      # 👉 Keystore ko decode karke android/app folder me save karo
+      - name: Decode keystore
+        run: |
+          mkdir -p android/app
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-key.keystore
+
+      # 👉 Signed release APK build
+      - name: Build signed Android APK
         run: |
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=app/release-key.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
+      # 👉 Signed APK ko artifact ke रूप me upload karo
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-signed
           path: android/app/build/outputs/apk/release/app-release.apk
