@@ -22,11 +22,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Set up Java
+           - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '21'
 
       - name: Install dependencies
         run: npm install
